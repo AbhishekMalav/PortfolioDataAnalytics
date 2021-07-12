@@ -1,0 +1,307 @@
+---
+title: "BellaBeats CaseStudy"
+author: "Malav"
+date: "11/07/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+## About the company
+Bellabeat is a high-tech company that manufactures health-focused smart products for women. Bellabeat is a successful small company, but they have the potential to become a larger player in theglobal smart device market. Urška Sršen and Sando Mur founded Bellabeat.
+
+### Business task
+You are a junior data analyst working on the marketing analyst team at Bellabeat. You have been asked to focus on one of Bellabeat’s products and analyze smart device data to gain insight into how consumers are using their smart devices. The insights you discover will then help guide marketing strategy for the company. You will present your analysis to the Bellabeat executive team along with your high-level recommendations for Bellabeat’s marketing strategy.
+
+
+
+## Ask
+
+#### Questions for the analysis
+*What are some trends in smart device usage?
+*How could these trends apply to Bellabeat customers?
+*How could these trends help influence Bellabeat marketing strategy?
+
+
+#### Stakeholders
+1) **Primary**: Bellabeat’s cofounder and Chief Creative Officer
+2) **Secondary**: Bellabeat marketing analytics team and executive team
+
+## Prepare
+
+#### Data Source
+
+[*FitBit Fitness Tracker Data*](https://www.kaggle.com/arashnic/fitbit "Link dataset") (CC0: Public Domain, dataset made available through Mobius): This Kaggle data set contains personal fitness tracker from thirty fitbit users. Thirty eligible Fitbit users consented to the submission of personal tracker data, including minute-level output for physical activity, heart rate, and sleep monitoring. It includes information about daily activity, steps, and heart rate that can be used to explore users’ habits.
+
+#### Data Limitations
+1) The 30 user sample size may not fully represent the population
+2) Bellabeats only makes product for women, but the data seems to contain no gender. That is, We may not      know whether the user is male or female.
+
+## Process
+
+#### Loading the packages
+```{r LoadingPackages}
+library(here)
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+```
+
+#### Importing datasets
+
+```{r ImportingDatasets}
+activity <- read.csv("Fitabase Data 4.12.16-5.12.16/dailyActivity_merged.csv")
+calories <- read.csv("Fitabase Data 4.12.16-5.12.16/hourlyCalories_merged.csv")
+intensity <- read.csv("Fitabase Data 4.12.16-5.12.16/hourlyIntensities_merged.csv")
+sleep <- read.csv("Fitabase Data 4.12.16-5.12.16/sleepDay_merged.csv")
+weight <- read.csv("Fitabase Data 4.12.16-5.12.16/weightLogInfo_merged.csv")
+```
+
+```{r headDatasets}
+head(activity)
+head(calories)
+head(intensity)
+head(sleep)
+head(weight)
+```
+
+**All these datsets have Id Column in common.** This Information maybe useful if we want to merge the datasets.
+
+#### Formatting the data
+Date is not as per our requirment, so it must be formatted. 
+
+
+```{r}
+# intensities
+intensity$ActivityHour=as.POSIXct(intensity$ActivityHour, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+intensity$time <- format(intensity$ActivityHour, format = "%H:%M:%S")
+intensity$date <- format(intensity$ActivityHour, format = "%m/%d/%y")
+# calories
+calories$ActivityHour=as.POSIXct(calories$ActivityHour, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+calories$time <- format(calories$ActivityHour, format = "%H:%M:%S")
+calories$date <- format(calories$ActivityHour, format = "%m/%d/%y")
+# activity
+activity$ActivityDate=as.POSIXct(activity$ActivityDate, format="%m/%d/%Y", tz=Sys.timezone())
+activity$date <- format(activity$ActivityDate, format = "%m/%d/%y")
+# sleep
+sleep$SleepDay=as.POSIXct(sleep$SleepDay, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+sleep$date <- format(sleep$SleepDay, format = "%m/%d/%y")
+```
+      
+#### Checking the number of unique IDs in datasets
+
+```{r NumberOfUniquesID}
+n_distinct(activity$Id)
+n_distinct(calories$Id)
+n_distinct(intensity$Id)
+n_distinct(sleep$Id)
+n_distinct(weight$Id)
+```
+We have 33 unique IDs in activity, calories and intensity datasets. 24 in sleep and 8 in weight dataset. Having only 8 parcipants will not be able to contribute towards any kind conclusions or reccommendations. 
+
+## Analyze
+
+#### Quick statistical summary of the datsaets
+
+1) Activity
+
+```{r summary}
+# activity
+activity %>%  
+  select(TotalSteps,
+         TotalDistance,
+         SedentaryMinutes, Calories) %>%
+  summary()
+```
+
+2) Distance
+
+```{r }
+# Distance
+activity %>%
+    select(VeryActiveDistance,
+           ModeratelyActiveDistance,
+           LightActiveDistance,
+           SedentaryActiveDistance) %>%
+    summary()
+```
+
+3) Minutes Active
+
+```{r }
+# explore num of active minutes per category
+activity %>%
+  select(VeryActiveMinutes, FairlyActiveMinutes, LightlyActiveMinutes) %>%
+  summary()
+```
+
+4) Calories Burnt
+
+```{r }
+# calories
+calories %>%
+  select(Calories) %>%
+  summary()
+```
+
+5) Sleep Record
+
+```{r }
+# sleep
+sleep %>%
+  select(TotalSleepRecords, TotalMinutesAsleep, TotalTimeInBed) %>%
+  summary()
+```
+
+6) Weight and BMI
+
+```{r }
+# weight
+weight %>%
+  select(WeightKg, BMI) %>%
+  summary()
+
+```
+
+**Some findings from the summary above**
+
+1) 7638 is the average number of steps taken by participants, which is a little less. According to           healthline, 10,000 steps/day is a reasonable target for healthy adults.
+2) 991 minutes or around 16.5 hours is the average sedentary time. It must be reduced in order to be         active.
+3) A person sleep an average of 7 hours in a day, which seems reasonable.
+
+#### Merging data
+We will be merging the two datasets, sleep and activity, by IDs and date in order to visualize. Also, We will be using inner join.
+
+```{r merging}
+merged <- merge(sleep, activity, by=c('Id', 'date'))
+head(merged)
+weight_activity_merged <- merge(activity, weight, by="Id")
+colnames(weight_activity_merged)
+```
+
+
+## Share
+
+#### Creating visualizations
+
+1) Total steps vs Calories
+```{r}
+ggplot(data=activity) + 
+  geom_point(mapping = aes(x=TotalSteps, y=Calories), color = 'purple') + 
+  geom_smooth(mapping = aes(x=TotalSteps, y=Calories)) + labs(title="Total Steps vs. Calories")
+
+```
+
+
+**We can safely assume the positive correlation between calories and total steps.It is justifies by the graph. It is also logical as more we walk more, calories we will burn**
+
+
+2) Distribution of total minutes of sleep
+```{r}
+ggplot(data = sleep, aes(x = sleep$TotalMinutesAsleep)) + 
+  geom_histogram(aes(y=..density..), binwidth=50,alpha=0.2)+
+  geom_density(alpha=0.2, fill="#FF6666") +
+  geom_vline(aes(xintercept=mean(TotalMinutesAsleep, na.rm=T)), color="red", linetype="dashed")+
+  labs(title="Total Minutes Asleep", x= "Total Minutes Asleep", y="Density")
+```
+
+**Sleep time is normally distrbutes among particaipants**
+
+3) Toal minutes asleep VS Total time in bed
+
+```{r}
+ggplot(data=sleep) + 
+  geom_point(mapping = aes(x=TotalMinutesAsleep, y=TotalTimeInBed) , color = 'hotpink')+ labs(title="Total Minutes Asleep vs. Total Time in Bed")
+
+```
+
+**We can clearly see that the relationship between total minutes asleep and total time in bed is linear**
+
+
+4) Weight Vs Category
+
+Firstly we want to categorize people into weight category so that it is easier for us to visulaize and draw conclusions.
+```{r}
+
+weight_weight_activity_merged_v2 <- weight_activity_merged %>% 
+  mutate(weight_category = case_when(WeightKg>62 & WeightKg <85  ~ "62-85", WeightKg >=85 ~ ">85", TRUE ~ "<62"))
+
+```
+
+```{r}
+ggplot(data = weight_weight_activity_merged_v2) + 
+  geom_col(mapping = aes(x = weight_weight_activity_merged_v2$weight_category, y = weight_weight_activity_merged_v2$TotalSteps, fill =weight_category )) + 
+  labs(title="Weight of a person vs the total steps taken", 
+x = "Weight", y = "Total steps taken")
+
+```
+
+**We can clearly see that people who weight less than 62 tend to walk more. So fitbit could recommend people with with greater than 62 to walk more in order to stay fit**
+
+
+5) Average Total intensity hourly
+
+```{r}
+intensity_new <- intensity %>%
+  group_by(time) %>%
+  drop_na() %>%
+  summarise(mean_total_intensity = mean(TotalIntensity))
+```
+
+
+```{r}
+ggplot(data=intensity_new, aes(x=time, y=mean_total_intensity)) + geom_histogram(stat = "identity", fill='turquoise2') +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(title="Average Total Intensity vs. Time")
+```
+
+**Here we can clearly see that people tend to be more active between 5 Am and 7 Pm. Maybe after 7 Pm we can we people to take a walk or hit the gym after office hours **
+
+
+6) Active Minutes by weekdays
+
+Changing the format of the date so that we can extract the weekday from it.
+
+```{r}
+activity$ActivityDate=as.POSIXct(activity$ActivityDate, format="%Y-%m-%d", tz=Sys.timezone())
+activity$date <- format(activity$ActivityDate, format = "%Y-%m-%d")
+```
+
+
+Extracting the weekday from date.
+
+```{r}
+
+activity$weekday <- weekdays(as.POSIXct(activity$date), abbreviate = F)
+
+```
+
+
+```{r}
+average_very_active_minutes <-activity %>% 
+  group_by(weekday) %>% 
+  summarise_at(vars(VeryActiveMinutes),
+               list(VeryActiveMinutes = mean))
+
+ggplot(average_very_active_minutes, aes(x=weekday,y=VeryActiveMinutes, group=1))+
+  geom_line(color = "blue")+
+  labs(title="Average Very Active Minutes by Weekdays", x= "weekday", y="Daily Very Active Minutes")+
+  geom_text(aes(label=round(VeryActiveMinutes, digits=0), hjust=-0.75, vjust=0.75),size=3)+
+  theme(plot.title = element_text(size=14), text = element_text(size=10), axis.text.x = element_text(angle=0, hjust=1))
+```
+
+**Lowest activty level are on thursdays, fridays and sundays. People start the week being motivated, but get demotivated by mid-week maybe due to work stress.**
+
+
+## Act
+
+**Recommendation:-**
+
++ Bellabeat app must remind people with weight between 62 - 80 to walk more frequently.
++ App to remind people to workout post office hours. 
++ App must motivate people to workout near the weekends.
++ App needs to remind people to reduce sedentary time. 
++ App need to set a target of 9000 steps / day which needs to be completed by person. Or remind the         person if the task is not completed. 
